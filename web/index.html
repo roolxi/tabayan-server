@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b2523">
+<meta name="description" content="تبيّن: ابحث عن الآيات والأحاديث وارجع إلى النص ومصدره.">
+<title>تبيّن — البحث في القرآن والحديث</title>
+<link rel="icon" href="/static/assets/tabayyan-logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/studio.css">
+<script src="/static/studio.js" defer></script>
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="shell">
+<header class="topbar">
+<a class="brand" href="/" aria-label="تبيّن — الرئيسية"><img src="/static/assets/tabayyan-logo.svg" alt="" width="48" height="42"><span>تبيّن<span class="brand-caption">للكلمة أصل</span></span></a>
+<nav aria-label="القائمة الرئيسية"><a class="nav-active" href="#workspace">مساحة التحقّق</a><a href="#how">كيف يعمل؟</a></nav>
+<button class="about-button" id="about-open" type="button"><span class="info-icon">i</span> عن تبيّن</button>
+</header>
+<main>
+<section class="hero" aria-labelledby="hero-title">
+<div class="hero-copy">
+<div class="eyebrow"><span></span> معرفة تبدأ بالتثبّت</div>
+<h1 id="hero-title">بين ما يُنقل،<br>وما <em>يُوثّق.</em></h1>
+<p class="hero-description">آية تتذكّرها، حديث وصلك، أو نص في صورة أو فيديو.<br>ابدأ من هنا، واعرف النص ومصدره.</p>
+<div class="hero-foot"><span class="tiny-star" aria-hidden="true">✦</span><p>الذكاء الاصطناعي يساعدك في الوصول.<br><strong>والمصدر هو المرجع.</strong></p></div>
+<div class="source-logos"><span>المصادر</span><b>تنزيل <small>TANZIL</small></b><i></i><b>الدرر السنية</b></div>
+</div>
+<div class="workspace-wrap" id="workspace">
+<div class="workspace" aria-label="البحث والتحقّق">
+<div class="panel-heading"><div><span class="overline">مساحة التحقّق</span><h2>ما الذي تبحث عنه؟</h2></div><span class="panel-symbol" aria-hidden="true">✧</span></div>
+<div class="tabs" role="tablist" aria-label="نوع البحث">
+<button class="tab active" id="tab-quran" role="tab" aria-selected="true" aria-controls="search-panel" data-tab="quran">القرآن الكريم</button>
+<button class="tab" id="tab-hadith" role="tab" aria-selected="false" aria-controls="search-panel" data-tab="hadith" tabindex="-1">الحديث الشريف</button>
+<button class="tab" id="tab-image" role="tab" aria-selected="false" aria-controls="search-panel" data-tab="image" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 4-6 5 7"/></svg> صورة أو فيديو</button>
+</div>
+<form id="search-form"><div id="search-panel" role="tabpanel" aria-labelledby="tab-quran">
+<div id="text-fields"><label class="input-label" for="query">اكتب الآية أو جزءًا منها</label><div class="input-wrap"><textarea id="query" maxlength="500" rows="3" placeholder="مثال: فإن مع العسر يسرا" spellcheck="false"></textarea><span class="input-mark" aria-hidden="true">❞</span><span class="counter"><span id="count">0</span> / 500</span></div></div>
+<div id="image-fields" hidden><label class="dropzone" id="dropzone" for="image-file"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m-4 4 4-4 4 4M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg><strong id="file-label">أضف صورة أو فيديو يحتوي على آية أو حديث</strong><span>اختر صورة أو فيديو أو اسحبه هنا</span><small>الصور: JPG · PNG · WEBP حتى 8 MB<br>الفيديو: MP4 · MOV · WEBM حتى 40 MB و3 دقائق</small><input id="image-file" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"></label><p class="image-help">نستخرج النص من الصورة أو صوت الفيديو، ثم نبحث عن مطابقته في المصادر.</p></div>
+</div>
+<button class="submit" id="submit" type="submit"><span id="submit-label">تبيّن من النص</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg></button>
+</form>
+<div id="examples" class="examples"><span>جرّب الآن</span><button type="button" data-example="فإن مع العسر يسرا">فإن مع العسر يسرا <span>↖</span></button><button type="button" data-example="وقل رب زدني علما">وقل رب زدني علما <span>↖</span></button></div>
+<div class="panel-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/></svg><span>النصوص والأحكام من المصادر، وليست مولّدة بالذكاء الاصطناعي.</span></div>
+</div><div class="under-panel"><span class="live-dot"></span> من العبارة إلى المصدر، في مكان واحد <span class="edition">TABAYYAN / WEB</span></div>
+</div>
+</section>
+<section id="results-section" class="results-section" hidden aria-labelledby="results-title"><div class="results-heading"><div><span class="overline">أقرب إلى المصدر</span><h2 id="results-title" tabindex="-1">نتائج البحث</h2></div><button id="clear-results" type="button">إغلاق النتائج ×</button></div><div id="status" role="status" aria-live="polite"></div><div id="results"></div></section>
+<section class="how" id="how" aria-label="كيف يعمل تبيّن"><div class="how-title"><span class="overline">رحلة أقصر. معرفة أوضح.</span><h2>من سؤال، إلى مصدر.</h2></div><div class="step"><span class="step-number">01</span><div><h3>ابدأ بما لديك</h3><p>كلمات تتذكّرها أو نص في صورة أو فيديو.</p></div></div><div class="step"><span class="step-number">02</span><div><h3>تعرّف على النص</h3><p>راجع النصوص المطابقة واختر ما تقصده.</p></div></div><div class="step"><span class="step-number">03</span><div><h3>ارجع إلى المصدر</h3><p>اقرأ الآية أو حكم المحدّث، وافتح المرجع.</p></div></div></section>
+</main>
+<footer><span>تبيّن <small> • للكلمة أصل</small></span><p>أداة للوصول إلى المصادر، وليست جهة إفتاء.</p><span class="footer-mark">تثبّت. ثم شارك.</span></footer>
+</div>
+<dialog id="about-dialog"><button class="dialog-close" id="about-close" aria-label="إغلاق">×</button><img src="/static/assets/tabayyan-logo.svg" width="64" height="56" alt=""><h2>المصدر هو المرجع.</h2><p>تبيّن يسهّل الوصول إلى الآيات من قاعدة نصوص تنزيل، وإلى الأحاديث وأحكام المحدّثين من الدرر السنية.</p><p>الذكاء الاصطناعي يساعد في استخراج النص من الصور والفيديو؛ لا يُستخدم لتوليد آيات أو إصدار أحكام على الأحاديث.</p><p>قد تكون المطابقة تقريبية، وقد تختلف الروايات وأحكام المحدّثين. عدم ظهور نتيجة لا يعني أن النص غير موجود أو أن الحديث موضوع. راجع المصدر والسياق، واسأل أهل العلم عند الحاجة.</p><div class="dialog-links"><a href="https://tanzil.net" target="_blank" rel="noopener noreferrer">مشروع تنزيل ↗</a><a href="https://dorar.net/hadith" target="_blank" rel="noopener noreferrer">الدرر السنية ↗</a></div></dialog>
+</body></html>
