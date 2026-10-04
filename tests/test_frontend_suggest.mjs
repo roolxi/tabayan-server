@@ -268,7 +268,7 @@ function createQuranEnv(fetchMock) {
   return { document, form, input, button, suggestButton, status, results };
 }
 
-// 1. Test Hadith suggest flow with paraphrase: “الحديث اللي يقول الأعمال تعتمد على النية”
+// 1. Test Hadith suggest flow with paraphrase describing the hadith
 async function testParaphraseHadithSuggestFlow() {
   const calls = [];
   const fetchMock = async (url, opts) => {

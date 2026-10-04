@@ -2,7 +2,7 @@
 
 سيرفر تبيّن للتحقق من صحة الآيات القرآنية والأحاديث النبوية. يوفر واجهة برمجية للبحث في نصوص القرآن عبر قاعدة بيانات محلية، والبحث في الأحاديث من الدرر السنية، والتعرف على النصوص من الصور ومقاطع الفيديو عبر الذكاء الاصطناعي.
 
-- الخادم الحي (Live API): https://tabayyan.duckdns.org
+- سيرفر العرض الحي (Live API): https://tabayyan.duckdns.org
 
 ---
 
@@ -18,21 +18,21 @@
 ## التشغيل المحلي
 
 ```bash
-# إنشاء بيئة بايثون وتفعيلها
+# Create and activate virtual environment
 python -m venv .venv
-source .venv/bin/activate  # على ويندوز: .venv\Scripts\activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-# تثبيت الحزم
+# Install dependencies
 pip install -r requirements.txt
 
-# إعداد ملف البيئة
+# Set up environment file
 cp .env.example .env
 
-# تشغيل السيرفر
+# Run server
 python server.py
 ```
 
-يعمل الخادم محلياً على: `http://127.0.0.1:8000`
+يعمل السيرفر محلياً على: `http://127.0.0.1:8000`
 
 ---
 
@@ -41,9 +41,9 @@ python server.py
 الخدمة مهيأة للتشغيل التلقائي عبر systemd:
 
 ```bash
-sudo systemctl status tabayyan   # فحص الحالة
-sudo systemctl restart tabayyan  # إعادة التشغيل
-sudo journalctl -u tabayyan -f   # متابعة السجلات
+sudo systemctl status tabayyan   # Check status
+sudo systemctl restart tabayyan  # Restart service
+sudo journalctl -u tabayyan -f   # Follow logs
 ```
 
 ---

@@ -315,7 +315,7 @@ async function test3_duplicateSubmitPrevention() {
   console.log("PASS: 3. Duplicate-submit prevention");
 }
 
-// 4. Rendering the static 'هل تقصد هذا النص؟' heading
+// 4. Rendering the static confirmation heading
 async function test4_renderStaticHeading() {
   const candidatesPayload = {
     status: "candidates",

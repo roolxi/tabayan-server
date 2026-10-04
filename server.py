@@ -258,7 +258,7 @@ def extract_hadith_fallback_queries(h_text: str) -> list[str]:
     cleaned = h_text.strip()
     sub_queries: list[str] = []
 
-    # 1. Check for reporting verbs: يقول, قال, قالت, سمعت, عنه
+    # 1. Check for reporting verbs: yaqool, qaala, qaalat, sami'tu, 'anhu
     m_verb = re.search(r"(?:يقول|قال|قالت|سمعت|عنه)\s*[:،,-]?\s*(.+)", cleaned)
     if m_verb:
         after_verb = m_verb.group(1).strip()

@@ -151,7 +151,7 @@ PUNCTUATION_REGEX = re.compile(r"[.,،؛:!؟?()\[\]{}\"\'«»\-–—]")
 def parse_dorar_json_result(html: str) -> list[str]:
     """Parse actual Hadith records returned in data['ahadith']['result'].
     Extracts only plain Hadith text, removing leading numbers, HTML tags,
-    search-keys spans, trailing separators, and 'المزيد' links.
+    search-keys spans, trailing separators, and 'more' links.
     """
     if not html or not isinstance(html, str):
         return []
@@ -159,14 +159,14 @@ def parse_dorar_json_result(html: str) -> list[str]:
     hadith_divs = soup.select("div.hadith, .hadith")
     candidates = []
     for div in hadith_divs:
-        # Strip any links such as 'المزيد'
+        # Strip any links such as 'more'
         for a in div.find_all("a"):
             a.decompose()
         # Extract text preserving words
         text = div.get_text(" ", strip=True)
         # Remove result numbering at beginning (e.g. '1 - ', '12 - ', '1. ')
         text = re.sub(r"^\s*\d+\s*[-–—.:]\s*", "", text)
-        # Remove trailing 'المزيد' or separators
+        # Remove trailing 'more' or separators
         text = re.sub(r"[\s\.\-–—]*المزيد\s*$", "", text)
         # Normalize whitespace
         text = re.sub(r"\s+", " ", text).strip()
