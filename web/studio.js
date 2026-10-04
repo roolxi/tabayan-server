@@ -1,6 +1,6 @@
 'use strict';
 const $ = s => document.querySelector(s);
-let mode = 'quran', searchType = 'text', controller = null, sequence = 0, file = null;
+let mode = 'quran', searchType = 'text', hadithMode = 'simple', controller = null, sequence = 0, file = null;
 
 const drafts = {
   quran: { text: '', meaning: '' },
@@ -46,6 +46,16 @@ function saveCurrentDraft() {
 function syncInputs() {
   document.querySelectorAll('[data-search-type]').forEach(btn => {
     const on = btn.dataset.searchType === searchType;
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-checked', on ? 'true' : 'false');
+  });
+
+  const hadithModeSelector = $('#hadith-mode-selector');
+  if (hadithModeSelector) {
+    hadithModeSelector.hidden = mode !== 'hadith' || searchType === 'meaning';
+  }
+  document.querySelectorAll('[data-hadith-mode]').forEach(btn => {
+    const on = btn.dataset.hadithMode === hadithMode;
     btn.classList.toggle('active', on);
     btn.setAttribute('aria-checked', on ? 'true' : 'false');
   });
@@ -132,6 +142,20 @@ document.querySelectorAll('[data-tab]').forEach(b => {
 
 document.querySelectorAll('[data-search-type]').forEach(btn => {
   btn.onclick = () => selectSearchType(btn.dataset.searchType);
+});
+
+function selectHadithMode(nextHadithMode) {
+  if (hadithMode === nextHadithMode) return;
+  stop();
+  hadithMode = nextHadithMode;
+  syncInputs();
+  if ($('#query').value.trim() && searchType === 'text') {
+    $('#search-form').requestSubmit();
+  }
+}
+
+document.querySelectorAll('[data-hadith-mode]').forEach(btn => {
+  btn.onclick = () => selectHadithMode(btn.dataset.hadithMode);
 });
 
 $('#query').oninput = () => {
@@ -253,15 +277,83 @@ function render(data, kind) {
       if (r.mixedCategories) showStatus('توجد أحكام مختلفة بين الروايات؛ راجع تفاصيل كل رواية ومصدرها.');
     }
   } else {
+    const isSimple = data.mode === 'simple';
     const p = data.simplePresentation;
-    if (p?.selected) {
-      card(p.selected.text, 'hadith', 'الدرر السنية', data.sourceUrl, p.selected.records);
-      for (const a of p.alternates || []) {
-        card(a.text, 'hadith', 'رواية أخرى · الدرر السنية', data.sourceUrl, a.records);
+    if (isSimple) {
+      if (p?.selected) {
+        const disclaimer = node('aside', 'pro-disclaimer-card');
+        const dIcon = node('span', 'disclaimer-icon', '✦');
+        const dText = node('div', 'disclaimer-body');
+        dText.append(
+          node('strong', '', 'العرض الميسّر لغير المتخصصين'),
+          node('p', '', 'النتائج معروضة من الصفحة الأولى في المصدر. لمزيد من التثبت والروايات وأقوال المحدثين وتخريج الأسانيد، يُفضّل الاطلاع على العرض المتخصص.')
+        );
+        const proBtn = node('button', 'pro-switch-btn', 'البحث في الوضع المتخصص (الموسوعة الكاملة) ↗');
+        proBtn.type = 'button';
+        proBtn.onclick = () => {
+          hadithMode = 'specialist';
+          syncInputs();
+          executeDirectSearch(data.query || $('#query').value.trim());
+        };
+        disclaimer.append(dIcon, dText, proBtn);
+        $('#results').append(disclaimer);
+
+        card(p.selected.text, 'hadith', 'الدرر السنية · العرض الميسّر', data.sourceUrl, p.selected.records);
+        for (const a of p.alternates || []) {
+          card(a.text, 'hadith', 'رواية أخرى · الدرر السنية', data.sourceUrl, a.records);
+        }
+      } else {
+        const noResultBox = node('div', 'no-results-pro-box');
+        const heading = node('h3', '', 'لم نجد نتيجة في العرض الميسّر لغير المتخصصين');
+        const desc = node('p', '', data.hint || 'قد يكون الحديث موجودًا في الموسوعة الحديثية المتخصصة بألفاظ أو روايات أخرى.');
+        const btnRow = node('div', 'pro-action-row');
+
+        const tryProBtn = node('button', 'submit try-pro-btn', 'البحث في الوضع المتخصص (الموسوعة الكاملة) ↗');
+        tryProBtn.type = 'button';
+        tryProBtn.onclick = () => {
+          hadithMode = 'specialist';
+          syncInputs();
+          executeDirectSearch(data.query || $('#query').value.trim());
+        };
+
+        const returnBtn = node('button', 'return-btn', 'تعديل عبارة البحث ←');
+        returnBtn.type = 'button';
+        returnBtn.onclick = () => {
+          $('#query').focus();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        btnRow.append(tryProBtn, returnBtn);
+        noResultBox.append(heading, desc, btnRow);
+        $('#results').append(noResultBox);
       }
     } else {
+      const specHeader = node('div', 'specialist-notice');
+      specHeader.append(
+        node('span', '', 'الموسوعة الحديثية المتخصصة — ' + (data.results?.length || 0) + ' نتيجة من المصدر')
+      );
+      const backToSimple = node('button', 'back-simple-btn', 'العودة للعرض الميسّر ←');
+      backToSimple.type = 'button';
+      backToSimple.onclick = () => {
+        hadithMode = 'simple';
+        syncInputs();
+        executeDirectSearch(data.query || $('#query').value.trim());
+      };
+      specHeader.append(backToSimple);
+      $('#results').append(specHeader);
+
       for (const r of data.results || []) {
-        card(r.text, 'hadith', 'الدرر السنية', r.sourceUrl || data.sourceUrl, [r]);
+        card(r.text, 'hadith', 'الموسوعة الحديثية · الدرر السنية', r.sourceUrl || data.sourceUrl, [r]);
+      }
+      if (!data.results || data.results.length === 0) {
+        showStatus(data.message || 'لم نجد نتائج لهذا البحث في العرض المتخصص. جرّب كلمات أخرى من الحديث.');
+        const returnBtn = node('button', 'return-btn', 'تعديل عبارة البحث ←');
+        returnBtn.type = 'button';
+        returnBtn.onclick = () => {
+          $('#query').focus();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+        $('#results').append(returnBtn);
       }
     }
   }
@@ -436,7 +528,7 @@ async function searchHadithCandidate(candidateText) {
     const response = await fetch('/api/hadith/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: candidateText, mode: 'simple' }),
+      body: JSON.stringify({ text: candidateText, mode: hadithMode }),
       signal
     });
     const data = await response.json();
@@ -619,7 +711,7 @@ async function executeDirectSearch(text) {
   try {
     const headers = { 'Content-Type': 'application/json' };
     const url = '/api/' + kind + '/search';
-    const body = JSON.stringify(kind === 'hadith' ? { text, mode: 'simple' } : { text });
+    const body = JSON.stringify(kind === 'hadith' ? { text, mode: hadithMode } : { text });
     const response = await fetch(url, { method: 'POST', headers, body, signal });
     const data = await response.json();
     if (id !== sequence) return;
