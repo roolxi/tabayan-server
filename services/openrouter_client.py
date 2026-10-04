@@ -192,7 +192,7 @@ def verify_and_ground_quran_candidates(raw_candidates: list[str], user_text: str
     """
     verses = _get_quran_verses()
     if not verses:
-        return raw_candidates
+        return []
 
     verified: list[str] = []
     seen: set[str] = set()

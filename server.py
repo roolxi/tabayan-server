@@ -46,6 +46,9 @@ from services.openrouter_client import (
     OpenRouterTimeout,
     check_rate_limit,
     extract_media_candidates,
+    suggest_search_phrases,
+    generate_hadith_search_queries,
+    select_hadith_candidate_ids,
 )
 from services.remote_media_processor import (
     RemoteMediaError,
@@ -119,6 +122,55 @@ class HadithSearchRequest(BaseModel):
         return value
 
 
+class SuggestRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    text: StrictStr
+    type: StrictStr
+
+    @field_validator("text")
+    @classmethod
+    def validate_text(cls, value: str) -> str:
+        value = value.strip()
+        if not 1 <= len(value) <= 500:
+            raise ValueError("الرجاء إدخال نص بحث من 1 إلى 500 حرف.")
+        return value
+
+    @field_validator("type")
+    @classmethod
+    def validate_type(cls, value: str) -> str:
+        value = value.strip().lower()
+        if value not in {"quran", "hadith"}:
+            raise ValueError("نوع البحث يجب أن يكون quran أو hadith.")
+        return value
+
+
+class MeaningSearchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    text: StrictStr
+    clarifications: list[StrictStr] = []
+
+    @field_validator("text")
+    @classmethod
+    def validate_text(cls, value: str) -> str:
+        value = value.strip()
+        if not 1 <= len(value) <= 500:
+            raise ValueError("الرجاء إدخال نص بحث من 1 إلى 500 حرف.")
+        return value
+
+    @field_validator("clarifications")
+    @classmethod
+    def validate_clarifications(cls, items: list[str]) -> list[str]:
+        if len(items) > 2:
+            raise ValueError("الحد الأقصى للتوضيحات هو 2.")
+        cleaned = []
+        for item in items:
+            val = item.strip()
+            if not 1 <= len(val) <= 500:
+                raise ValueError("التوضيح يجب أن يكون من 1 إلى 500 حرف.")
+            cleaned.append(val)
+        return cleaned
+
+
 def get_client_ip(request: Request) -> str:
     trusted_proxies = os.getenv("TRUSTED_PROXIES")
     direct_host = request.client.host if request.client else "127.0.0.1"
@@ -140,6 +192,169 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
     return JSONResponse(
         status_code=422,
         content={"message": msg},
+    )
+
+
+@app.post("/api/search/suggest")
+def search_suggest(payload: SuggestRequest, request: Request) -> JSONResponse:
+    client_ip = get_client_ip(request)
+    try:
+        candidates = suggest_search_phrases(
+            text=payload.text,
+            corpus_type=payload.type,
+            client_ip=client_ip,
+        )
+        response = {
+            "query": payload.text,
+            "type": payload.type,
+            "candidates": candidates,
+        }
+        if not candidates:
+            response["message"] = "لم نتمكن من اقتراح عبارة مناسبة. جرّب إضافة كلمات تتذكرها."
+        return JSONResponse(content=response)
+    except OpenRouterNotConfigured:
+        return JSONResponse(
+            status_code=503,
+            content={"code": "ai_not_configured", "message": "البحث بالمعنى غير مفعّل حاليًا."},
+        )
+    except OpenRouterTimeout:
+        return JSONResponse(
+            status_code=504,
+            content={"code": "ai_timeout", "message": "تعذّر البحث بالمعنى حاليًا. يمكنك استخدام البحث العادي."},
+        )
+    except OpenRouterRateLimited:
+        return JSONResponse(
+            status_code=429,
+            content={"code": "ai_rate_limited", "message": "تجاوزت الحد المسموح من طلبات البحث بالمعنى. يُرجى الانتظار قليلًا."},
+        )
+    except OpenRouterSourceError:
+        return JSONResponse(
+            status_code=502,
+            content={"code": "ai_unavailable", "message": "تعذّر البحث بالمعنى حاليًا. يمكنك استخدام البحث العادي."},
+        )
+    except Exception:
+        logger.exception("Unexpected error in /api/search/suggest")
+        return JSONResponse(
+            status_code=500,
+            content={"code": "ai_internal_error", "message": "تعذّر البحث بالمعنى حاليًا. يمكنك استخدام البحث العادي."},
+        )
+
+
+def _make_no_candidate_response(attempt: int) -> dict:
+    if attempt == 1:
+        return {
+            "status": "needs_clarification",
+            "attempt": 1,
+            "attemptsRemaining": 2,
+            "message": "وضّح المعنى أكثر، واذكر الموقف أو أي كلمة تتذكرها.",
+        }
+    elif attempt == 2:
+        return {
+            "status": "needs_clarification",
+            "attempt": 2,
+            "attemptsRemaining": 1,
+            "message": "حاول توضيح المعنى مرة أخيرة، مثل من قال الحديث أو الموقف الذي ورد فيه.",
+        }
+    else:
+        return {
+            "status": "not_found",
+            "attempt": 3,
+            "attemptsRemaining": 0,
+            "message": "لم نتمكن من تحديد الحديث من الوصف الذي أدخلته.",
+        }
+
+
+@app.post("/api/hadith/meaning-search")
+def hadith_meaning_search(payload: MeaningSearchRequest, request: Request) -> JSONResponse:
+    client_ip = get_client_ip(request)
+    attempt = len(payload.clarifications) + 1
+
+    try:
+        check_rate_limit(client_ip)
+    except OpenRouterRateLimited:
+        return JSONResponse(
+            status_code=429,
+            content={
+                "status": "temporarily_unavailable",
+                "message": "تجاوزت الحد المسموح من طلبات البحث بالمعنى. يُرجى الانتظار قليلًا.",
+            },
+        )
+
+    # 1. Call 1: Query generation
+    try:
+        queries = generate_hadith_search_queries(payload.text, payload.clarifications)
+    except (OpenRouterError, Exception) as err:
+        logger.warning("Call 1 failed: %s", err)
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "temporarily_unavailable",
+                "message": "تعذّر إكمال البحث حاليًا. حاول مرة أخرى.",
+            },
+        )
+
+    if not queries:
+        return JSONResponse(content=_make_no_candidate_response(attempt))
+
+    # 2. Dorar JSON API Retrieval
+    raw_candidates = []
+    success_count = 0
+    error_count = 0
+    for query in queries[:3]:
+        try:
+            html = fetch_dorar_json_api(query)
+            success_count += 1
+            texts = parse_dorar_json_result(html)
+            raw_candidates.extend(texts)
+        except (DorarError, Exception) as err:
+            error_count += 1
+            logger.warning("Dorar JSON API error for query '%s': %s", query, err)
+
+    if success_count == 0 and error_count > 0:
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "temporarily_unavailable",
+                "message": "تعذّر إكمال البحث حاليًا. حاول مرة أخرى.",
+            },
+        )
+
+    # 3. Deduplicate
+    deduped = deduplicate_hadith_candidates(raw_candidates, max_count=30)
+    if not deduped:
+        return JSONResponse(content=_make_no_candidate_response(attempt))
+
+    candidate_map = {c["id"]: c["text"] for c in deduped}
+
+    # 4. Call 2: Candidate selection
+    try:
+        selected_ids = select_hadith_candidate_ids(payload.text, payload.clarifications, deduped)
+    except (OpenRouterError, Exception) as err:
+        logger.warning("Call 2 failed: %s", err)
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "temporarily_unavailable",
+                "message": "تعذّر إكمال البحث حاليًا. حاول مرة أخرى.",
+            },
+        )
+
+    # Server validation: only known candidate IDs from candidate_map
+    valid_selected = [cid for cid in selected_ids if cid in candidate_map]
+    if not valid_selected:
+        return JSONResponse(content=_make_no_candidate_response(attempt))
+
+    return JSONResponse(
+        content={
+            "status": "candidates",
+            "attempt": attempt,
+            "source": "dorar",
+            "candidates": [
+                {"id": cid, "text": candidate_map[cid]}
+                for cid in valid_selected[:3]
+            ],
+            "message": "هل تقصد أحد هذه الأحاديث؟",
+        }
     )
 
 

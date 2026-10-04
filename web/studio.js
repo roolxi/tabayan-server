@@ -1,10 +1,26 @@
 'use strict';
 const $ = s => document.querySelector(s);
-let mode = 'quran', controller = null, sequence = 0, file = null;
-const drafts = { quran: '', hadith: '' };
+let mode = 'quran', searchType = 'text', controller = null, sequence = 0, file = null;
+
+const drafts = {
+  quran: { text: '', meaning: '' },
+  hadith: { text: '', meaning: '' }
+};
+
 const examples = {
-  quran: ['فإن مع العسر يسرا', 'وقل رب زدني علما'],
-  hadith: ['إنما الأعمال بالنيات', 'من كان يؤمن بالله واليوم الآخر']
+  quran: {
+    text: ['فإن مع العسر يسرا', 'وقل رب زدني علما'],
+    meaning: ['آية عن اليسر بعد العسر', 'آية في طلب زيادة العلم']
+  },
+  hadith: {
+    text: ['إنما الأعمال بالنيات', 'من كان يؤمن بالله واليوم الآخر'],
+    meaning: ['حديث عن النية والعمل', 'حديث عن إكرام الجار والضيف']
+  }
+};
+
+let hadithMeaningState = {
+  baseQuery: '',
+  clarifications: []
 };
 
 function node(tag, cls, text) {
@@ -21,10 +37,55 @@ function stop() {
   $('#submit').disabled = false;
 }
 
+function saveCurrentDraft() {
+  if (mode !== 'image') {
+    drafts[mode][searchType] = $('#query').value;
+  }
+}
+
+function syncInputs() {
+  document.querySelectorAll('[data-search-type]').forEach(btn => {
+    const on = btn.dataset.searchType === searchType;
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-checked', on ? 'true' : 'false');
+  });
+
+  if (mode === 'image') {
+    $('#submit-label').textContent = 'استخراج النص والتحقّق';
+    return;
+  }
+
+  if (searchType === 'meaning') {
+    $('.input-label').textContent = 'صف المعنى الذي تتذكره';
+    $('#query').placeholder = mode === 'hadith'
+      ? 'مثال: حديث عن ثواب إماطة الأذى أو الإحسان للجار'
+      : 'مثال: آية عن أن بعد الشدة فرج ويسر';
+    $('#submit-label').textContent = 'ابحث بالمعنى';
+  } else {
+    $('.input-label').textContent = mode === 'hadith' ? 'اكتب الحديث أو جزءًا منه' : 'اكتب الآية أو جزءًا منها';
+    $('#query').placeholder = 'مثال: ' + (examples[mode].text[0] || '');
+    $('#submit-label').textContent = 'تبيّن من النص';
+  }
+
+  $('#examples').replaceChildren(node('span', '', 'جرّب الآن'));
+  const list = examples[mode]?.[searchType] || [];
+  list.forEach(t => {
+    const b = node('button', '', t + ' ↖');
+    b.type = 'button';
+    b.onclick = () => {
+      $('#query').value = t;
+      $('#query').dispatchEvent(new Event('input'));
+      $('#search-form').requestSubmit();
+    };
+    $('#examples').append(b);
+  });
+}
+
 function selectMode(next) {
-  drafts[mode] = $('#query').value;
+  saveCurrentDraft();
   stop();
   mode = next;
+  hadithMeaningState = { baseQuery: '', clarifications: [] };
   $('#results-section').hidden = true;
   document.querySelectorAll('[data-tab]').forEach(b => {
     const on = b.dataset.tab === mode;
@@ -36,22 +97,24 @@ function selectMode(next) {
   $('#text-fields').hidden = mode === 'image';
   $('#image-fields').hidden = mode !== 'image';
   $('#examples').hidden = mode === 'image';
-  $('#query').value = drafts[mode] || '';
+  if (mode !== 'image') {
+    $('#query').value = drafts[mode][searchType] || '';
+    $('#count').textContent = $('#query').value.length;
+  }
+  syncInputs();
+}
+
+function selectSearchType(nextType) {
+  if (searchType === nextType) return;
+  saveCurrentDraft();
+  stop();
+  searchType = nextType;
+  hadithMeaningState = { baseQuery: '', clarifications: [] };
+  $('#results-section').hidden = true;
+  $('#query').value = drafts[mode][searchType] || '';
   $('#count').textContent = $('#query').value.length;
-  $('.input-label').textContent = mode === 'hadith' ? 'اكتب الحديث أو جزءًا منه' : 'اكتب الآية أو جزءًا منها';
-  $('#query').placeholder = 'مثال: ' + (examples[mode]?.[0] || '');
-  $('#submit-label').textContent = mode === 'image' ? 'استخراج النص والتحقّق' : 'تبيّن من النص';
-  $('#examples').replaceChildren(node('span', '', 'جرّب الآن'));
-  (examples[mode] || []).forEach(t => {
-    const b = node('button', '', t + ' ↖');
-    b.type = 'button';
-    b.onclick = () => {
-      $('#query').value = t;
-      $('#query').dispatchEvent(new Event('input'));
-      $('#search-form').requestSubmit();
-    };
-    $('#examples').append(b);
-  });
+  syncInputs();
+  $('#query').focus();
 }
 
 document.querySelectorAll('[data-tab]').forEach(b => {
@@ -67,8 +130,20 @@ document.querySelectorAll('[data-tab]').forEach(b => {
   };
 });
 
+document.querySelectorAll('[data-search-type]').forEach(btn => {
+  btn.onclick = () => selectSearchType(btn.dataset.searchType);
+});
+
 $('#query').oninput = () => {
   $('#count').textContent = $('#query').value.length;
+  if (mode === 'hadith' && searchType === 'meaning') {
+    const current = $('#query').value.trim();
+    if (hadithMeaningState.baseQuery && current !== hadithMeaningState.baseQuery) {
+      hadithMeaningState = { baseQuery: '', clarifications: [] };
+      const clarPanel = $('#results .clarification-panel');
+      if (clarPanel) clarPanel.remove();
+    }
+  }
 };
 
 function showStatus(message, error = false) {
@@ -141,7 +216,9 @@ function card(text, type, meta, url, items) {
   const c = node('article', 'result-card');
   const head = node('div', 'result-meta');
   head.append(node('span', 'result-type', type === 'quran' ? 'القرآن الكريم' : 'الحديث الشريف'), node('span', '', meta));
-  c.append(head, node('p', 'verse', text));
+  const p = node('p', 'verse');
+  p.textContent = text;
+  c.append(head, p);
   if (items) records(c, items);
   const bottom = node('div', 'result-bottom');
   bottom.append(link('الرجوع إلى المصدر ↗', url));
@@ -193,13 +270,319 @@ function render(data, kind) {
   }
 }
 
-$('#search-form').onsubmit = async e => {
-  e.preventDefault();
-  const text = $('#query').value.trim();
-  if (mode === 'image' ? !file : !text) {
-    showStatus(mode === 'image' ? 'أضف صورة أو فيديو أولًا.' : 'اكتب عبارة للبحث أولًا.', true);
+function renderQuranSuggestions(candidates) {
+  $('#results').replaceChildren();
+  $('#results-title').textContent = 'عبارات بحث مقترحة';
+  showStatus('هذه اقتراحات للبحث، وليست نصوصًا موثّقة. اختر عبارة لتأكيد نصها في المصحف:');
+  candidates.forEach(cand => {
+    const c = node('article', 'result-card candidate-card');
+    const head = node('div', 'result-meta');
+    head.append(node('span', 'result-type', 'اقتراح بحث'));
+    const p = node('p', 'candidate-phrase');
+    p.textContent = cand;
+    const bottom = node('div', 'result-bottom');
+    const btn = node('button', 'submit candidate-pick-btn', 'البحث بهذه العبارة في المصحف ←');
+    btn.type = 'button';
+    btn.onclick = () => {
+      searchQuranCandidate(cand);
+    };
+    bottom.append(btn);
+    c.append(head, p, bottom);
+    $('#results').append(c);
+  });
+}
+
+async function searchQuranCandidate(phrase) {
+  stop();
+  const id = sequence;
+  controller = new AbortController();
+  const signal = controller.signal;
+  $('#results').replaceChildren();
+  showStatus('');
+  $('#results-title').textContent = 'نبحث في المصحف الشريف…';
+  const loading = node('div', 'loader');
+  loading.append(node('span', 'loader-ring'));
+  const caption = node('div', '', 'نتحقق من نص الآية في قاعدة بيانات المصحف…');
+  loading.append(caption);
+  $('#status').append(loading);
+  $('#submit').disabled = true;
+
+  try {
+    const response = await fetch('/api/quran/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: phrase }),
+      signal
+    });
+    const data = await response.json();
+    if (id !== sequence) return;
+    if (!response.ok) {
+      showStatus(data.message || 'تعذّر البحث في المصحف حاليًا.', true);
+      return;
+    }
+    render(data, 'quran');
+    if (data.results && data.results.length > 0) {
+      showStatus('عُثر على ' + data.total + ' نتيجة للعبارة: ' + phrase);
+    }
+  } catch (err) {
+    if (id !== sequence) return;
+    showStatus(err.name === 'AbortError' ? 'تم إلغاء البحث.' : err.message || 'تعذّر البحث في المصحف حاليًا.', true);
+  } finally {
+    if (id === sequence) {
+      controller = null;
+      $('#submit').disabled = false;
+    }
+  }
+}
+
+function renderRetryButton(retryFn) {
+  const panel = node('div', 'retry-panel');
+  const btn = node('button', 'retry-btn', 'إعادة المحاولة ↻');
+  btn.type = 'button';
+  btn.onclick = retryFn;
+  panel.append(btn);
+  $('#results').append(panel);
+}
+
+function renderHadithCandidates(candidates) {
+  $('#results').replaceChildren();
+  $('#results-title').textContent = 'هل تقصد أحد هذه الأحاديث؟';
+  showStatus('هذه نصوص استُرجعت من الدرر السنية بناءً على المعنى، وليست حكمًا على صحة الحديث. اختر حديثًا للتحقق من حكمه وسنده في المصدر:');
+  if (!candidates || candidates.length === 0) {
+    showStatus('لم نتمكن من العثور على أحاديث مطابقة للوصف. جرّب كلمات أخرى.');
     return;
   }
+  candidates.forEach(cand => {
+    const text = typeof cand === 'object' && cand !== null ? cand.text : String(cand);
+    const c = node('article', 'result-card candidate-card');
+    const head = node('div', 'result-meta');
+    head.append(node('span', 'result-type', 'الدرر السنية · نص مسترجع'));
+    const p = node('p', 'candidate-phrase');
+    p.textContent = text;
+    const bottom = node('div', 'result-bottom');
+    const btn = node('button', 'submit candidate-pick-btn', 'التحقق من هذا الحديث ←');
+    btn.type = 'button';
+    btn.onclick = () => {
+      searchHadithCandidate(text);
+    };
+    bottom.append(btn);
+    c.append(head, p, bottom);
+    $('#results').append(c);
+  });
+}
+
+function renderClarificationInput(data) {
+  $('#results').replaceChildren();
+  $('#results-title').textContent = 'مطلوب توضيح المعنى';
+  showStatus(data.message || 'وضّح المعنى أكثر، واذكر الموقف أو أي كلمة تتذكرها.');
+
+  const panel = node('div', 'clarification-panel');
+  const attemptsText = data.attemptsRemaining === 1 ? 'المحاولة الأخيرة' : 'المحاولة ' + (data.attempt || 1);
+  const h = node('h3', '', 'توضيح المعنى (' + attemptsText + ')');
+  const desc = node('p', '', 'اذكر تفاصيل إضافية مثل راوي الحديث، أو الموقف الذي ورد فيه:');
+  const row = node('div', 'clarification-row');
+  const inp = node('input', 'clarification-input');
+  inp.type = 'text';
+  inp.maxLength = 500;
+  inp.placeholder = 'أضف توضيحًا للمعنى هنا…';
+  const btn = node('button', 'clarification-submit', 'إرسال التوضيح والبحث');
+  btn.type = 'button';
+
+  const submitClarification = () => {
+    const val = inp.value.trim();
+    if (!val) {
+      inp.focus();
+      return;
+    }
+    if (hadithMeaningState.clarifications.length >= 2) {
+      showStatus('تم بلوغ الحد الأقصى للتوضيحات.', true);
+      return;
+    }
+    hadithMeaningState.clarifications.push(val);
+    executeHadithMeaningSearch(false);
+  };
+
+  btn.onclick = submitClarification;
+  inp.onkeydown = e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submitClarification();
+    }
+  };
+
+  row.append(inp, btn);
+  panel.append(h, desc, row);
+  $('#results').append(panel);
+  inp.focus();
+}
+
+async function searchHadithCandidate(candidateText) {
+  stop();
+  const id = sequence;
+  controller = new AbortController();
+  const signal = controller.signal;
+  $('#results').replaceChildren();
+  showStatus('');
+  $('#results-title').textContent = 'نتحقق من حكم الحديث في الدرر السنية…';
+  const loading = node('div', 'loader');
+  loading.append(node('span', 'loader-ring'));
+  const caption = node('div', '', 'نبحث في الموسوعة الحديثية بالدرر السنية…');
+  caption.append(node('span', 'loading-detail', 'نعرض حكم المحدث ومصدره كما ورد في المصدر.'));
+  loading.append(caption);
+  $('#status').append(loading);
+  $('#submit').disabled = true;
+
+  try {
+    const response = await fetch('/api/hadith/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: candidateText, mode: 'simple' }),
+      signal
+    });
+    const data = await response.json();
+    if (id !== sequence) return;
+    if (!response.ok) {
+      showStatus(data.message || 'تعذّر الاتصال بالدرر السنية حاليًا.', true);
+      return;
+    }
+    render(data, 'hadith');
+  } catch (err) {
+    if (id !== sequence) return;
+    showStatus(err.name === 'AbortError' ? 'تم إلغاء البحث.' : err.message || 'تعذّر الاتصال بالدرر السنية حاليًا.', true);
+  } finally {
+    if (id === sequence) {
+      controller = null;
+      $('#submit').disabled = false;
+    }
+  }
+}
+
+async function executeHadithMeaningSearch(isRetry = false) {
+  stop();
+  const id = sequence;
+  controller = new AbortController();
+  const signal = controller.signal;
+  $('#results').replaceChildren();
+  showStatus('');
+  $('#results-title').textContent = 'نبحث عن أحاديث محتملة…';
+  const loading = node('div', 'loader');
+  loading.append(node('span', 'loader-ring'));
+  const caption = node('div', '', 'نبحث عن أحاديث مطابقة للمعنى في الدرر السنية…');
+  caption.append(node('span', 'loading-detail', 'يتم استرجاع النصوص الأصلية والتحقق منها.'));
+  loading.append(caption);
+  const cancel = node('button', 'cancel-button', 'إلغاء');
+  cancel.type = 'button';
+  cancel.onclick = () => {
+    stop();
+    showStatus('تم إلغاء البحث.');
+  };
+  loading.append(cancel);
+  $('#status').append(loading);
+  $('#submit').disabled = true;
+  $('#results-section').scrollIntoView({
+    behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    block: 'start'
+  });
+
+  try {
+    const response = await fetch('/api/hadith/meaning-search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: hadithMeaningState.baseQuery,
+        clarifications: hadithMeaningState.clarifications
+      }),
+      signal
+    });
+    const data = await response.json();
+    if (id !== sequence) return;
+
+    if (data.status === 'temporarily_unavailable' || !response.ok) {
+      showStatus(data.message || 'تعذّر إكمال البحث حاليًا. حاول مرة أخرى.', true);
+      renderRetryButton(() => executeHadithMeaningSearch(true));
+      return;
+    }
+
+    if (data.status === 'candidates') {
+      renderHadithCandidates(data.candidates || []);
+    } else if (data.status === 'needs_clarification') {
+      renderClarificationInput(data);
+    } else if (data.status === 'not_found') {
+      showStatus(data.message || 'لم نتمكن من تحديد الحديث من الوصف الذي أدخلته.');
+      hadithMeaningState = { baseQuery: '', clarifications: [] };
+    } else {
+      showStatus(data.message || 'تعذّر إكمال البحث حاليًا. حاول مرة أخرى.', true);
+      renderRetryButton(() => executeHadithMeaningSearch(true));
+    }
+  } catch (err) {
+    if (id !== sequence) return;
+    showStatus(err.name === 'AbortError' ? 'تم إلغاء البحث.' : err.message || 'تعذّر إكمال البحث حاليًا. حاول مرة أخرى.', true);
+    renderRetryButton(() => executeHadithMeaningSearch(true));
+  } finally {
+    if (id === sequence) {
+      controller = null;
+      $('#submit').disabled = false;
+    }
+  }
+}
+
+async function executeQuranMeaningSearch(text) {
+  stop();
+  const id = sequence;
+  controller = new AbortController();
+  const signal = controller.signal;
+  $('#results').replaceChildren();
+  showStatus('');
+  $('#results-title').textContent = 'نبحث عن الآيات بالمعنى…';
+  const loading = node('div', 'loader');
+  loading.append(node('span', 'loader-ring'));
+  const caption = node('div', '', 'نقترح عبارات قرآنية محققة ومطابقة للمعنى…');
+  caption.append(node('span', 'loading-detail', 'المصدر هو المرجع المعتمد للتحقق.'));
+  loading.append(caption);
+  const cancel = node('button', 'cancel-button', 'إلغاء');
+  cancel.type = 'button';
+  cancel.onclick = () => {
+    stop();
+    showStatus('تم إلغاء البحث.');
+  };
+  loading.append(cancel);
+  $('#status').append(loading);
+  $('#submit').disabled = true;
+  $('#results-section').scrollIntoView({
+    behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    block: 'start'
+  });
+
+  try {
+    const response = await fetch('/api/search/suggest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, type: 'quran' }),
+      signal
+    });
+    const data = await response.json();
+    if (id !== sequence) return;
+    if (!response.ok) {
+      showStatus(data.message || 'تعذّر البحث بالمعنى حاليًا. يمكنك استخدام البحث العادي.', true);
+      return;
+    }
+    if (!data.candidates || data.candidates.length === 0) {
+      showStatus(data.message || 'لم نتمكن من اقتراح عبارة مناسبة. جرّب إضافة كلمات تتذكرها.');
+      return;
+    }
+    renderQuranSuggestions(data.candidates);
+  } catch (err) {
+    if (id !== sequence) return;
+    showStatus(err.name === 'AbortError' ? 'تم إلغاء البحث.' : err.message || 'تعذّر البحث بالمعنى حاليًا. يمكنك استخدام البحث العادي.', true);
+  } finally {
+    if (id === sequence) {
+      controller = null;
+      $('#submit').disabled = false;
+    }
+  }
+}
+
+async function executeDirectSearch(text) {
   stop();
   const id = sequence;
   controller = new AbortController();
@@ -210,7 +593,7 @@ $('#search-form').onsubmit = async e => {
   $('#results-title').textContent = 'نبحث في المصادر…';
   const loading = node('div', 'loader');
   loading.append(node('span', 'loader-ring'));
-  const caption = node('div', '', kind === 'image' ? 'نستخرج النص من الوسائط ونطابقه بالمصادر…' : 'نبحث عن النص في المصدر…');
+  const caption = node('div', '', 'نبحث عن النص في المصدر…');
   caption.append(node('span', 'loading-detail', 'تظهر النتائج عند اكتمال الطلب.'));
   loading.append(caption);
   const cancel = node('button', 'cancel-button', 'إلغاء');
@@ -234,16 +617,9 @@ $('#search-form').onsubmit = async e => {
   }, 180000);
 
   try {
-    let url, body, headers;
-    if (kind === 'image') {
-      url = '/api/media/extract';
-      body = new FormData();
-      body.append('file', file);
-    } else {
-      headers = { 'Content-Type': 'application/json' };
-      url = '/api/' + kind + '/search';
-      body = JSON.stringify(kind === 'hadith' ? { text, mode: 'simple' } : { text });
-    }
+    const headers = { 'Content-Type': 'application/json' };
+    const url = '/api/' + kind + '/search';
+    const body = JSON.stringify(kind === 'hadith' ? { text, mode: 'simple' } : { text });
     const response = await fetch(url, { method: 'POST', headers, body, signal });
     const data = await response.json();
     if (id !== sequence) return;
@@ -253,13 +629,92 @@ $('#search-form').onsubmit = async e => {
     render(data, kind);
   } catch (err) {
     if (id !== sequence) return;
-    showStatus(timedOut ? (kind === 'image' ? 'استغرقت المعالجة وقتًا طويلًا. جرّب صورة أو مقطعًا أقصر.' : 'استغرق البحث وقتًا طويلًا. حاول بعبارة أقصر.') : err.name === 'AbortError' ? 'تم إلغاء البحث.' : err.message || 'تعذّر الاتصال بالسيرفر.', true);
+    showStatus(timedOut ? 'استغرق البحث وقتًا طويلًا. حاول بعبارة أقصر.' : err.name === 'AbortError' ? 'تم إلغاء البحث.' : err.message || 'تعذّر الاتصال بالسيرفر.', true);
   } finally {
     clearTimeout(timer);
     if (id === sequence) {
       controller = null;
       $('#submit').disabled = false;
     }
+  }
+}
+
+async function executeMediaSearch() {
+  stop();
+  const id = sequence;
+  controller = new AbortController();
+  const signal = controller.signal;
+  $('#results').replaceChildren();
+  showStatus('');
+  $('#results-title').textContent = 'نستخرج النص من الوسائط ونطابقه بالمصادر…';
+  const loading = node('div', 'loader');
+  loading.append(node('span', 'loader-ring'));
+  const caption = node('div', '', 'نستخرج النص من الوسائط ونطابقه بالمصادر…');
+  caption.append(node('span', 'loading-detail', 'تظهر النتائج عند اكتمال الطلب.'));
+  loading.append(caption);
+  const cancel = node('button', 'cancel-button', 'إلغاء');
+  cancel.type = 'button';
+  cancel.onclick = () => {
+    stop();
+    showStatus('تم إلغاء البحث.');
+  };
+  loading.append(cancel);
+  $('#status').append(loading);
+  $('#submit').disabled = true;
+  $('#results-section').scrollIntoView({
+    behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    block: 'start'
+  });
+
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller?.abort();
+  }, 180000);
+
+  try {
+    const body = new FormData();
+    body.append('file', file);
+    const response = await fetch('/api/media/extract', { method: 'POST', body, signal });
+    const data = await response.json();
+    if (id !== sequence) return;
+    if (!response.ok) {
+      throw new Error(data.message || 'تعذّر إتمام الطلب. تأكّد من اتصال السيرفر وحاول مجددًا.');
+    }
+    render(data, 'image');
+  } catch (err) {
+    if (id !== sequence) return;
+    showStatus(timedOut ? 'استغرقت المعالجة وقتًا طويلًا. جرّب صورة أو مقطعًا أقصر.' : err.name === 'AbortError' ? 'تم إلغاء البحث.' : err.message || 'تعذّر الاتصال بالسيرفر.', true);
+  } finally {
+    clearTimeout(timer);
+    if (id === sequence) {
+      controller = null;
+      $('#submit').disabled = false;
+    }
+  }
+}
+
+$('#search-form').onsubmit = async e => {
+  e.preventDefault();
+  const text = $('#query').value.trim();
+  if (mode === 'image' ? !file : !text) {
+    showStatus(mode === 'image' ? 'أضف صورة أو فيديو أولًا.' : (searchType === 'meaning' ? 'صف المعنى أولًا.' : 'اكتب عبارة للبحث أولًا.'), true);
+    return;
+  }
+
+  if (mode === 'image') {
+    executeMediaSearch();
+    return;
+  }
+
+  if (searchType === 'text') {
+    executeDirectSearch(text);
+  } else if (mode === 'quran') {
+    executeQuranMeaningSearch(text);
+  } else if (mode === 'hadith') {
+    hadithMeaningState.baseQuery = text;
+    hadithMeaningState.clarifications = [];
+    executeHadithMeaningSearch();
   }
 };
 
