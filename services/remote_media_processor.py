@@ -36,7 +36,7 @@ from services.openrouter_client import (
 logger = logging.getLogger(__name__)
 
 # Centralized configurable limits with safe defaults
-REMOTE_MEDIA_MAX_DURATION_SECONDS = int(os.getenv("REMOTE_MEDIA_MAX_DURATION_SECONDS", "3600"))
+REMOTE_MEDIA_MAX_DURATION_SECONDS = int(os.getenv("REMOTE_MEDIA_MAX_DURATION_SECONDS", "600"))
 REMOTE_MEDIA_MAX_SOURCE_BYTES = int(os.getenv("REMOTE_MEDIA_MAX_SOURCE_BYTES", "104857600"))  # 100 MiB
 REMOTE_MEDIA_DOWNLOAD_TIMEOUT_SECONDS = int(os.getenv("REMOTE_MEDIA_DOWNLOAD_TIMEOUT_SECONDS", "120"))
 REMOTE_MEDIA_AUDIO_CHUNK_SECONDS = int(os.getenv("REMOTE_MEDIA_AUDIO_CHUNK_SECONDS", "300"))
@@ -646,4 +646,3 @@ class RemoteMediaJobRegistry:
 
 # Global singleton registry
 job_registry = RemoteMediaJobRegistry()
-

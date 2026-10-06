@@ -1,6 +1,6 @@
 'use strict';
 const $ = s => document.querySelector(s);
-let mode = 'quran', searchType = 'text', hadithMode = 'simple', controller = null, sequence = 0, file = null;
+let mode = 'quran', searchType = 'text', hadithMode = 'simple', controller = null, sequence = 0, file = null, mediaSource = 'file';
 
 const drafts = {
   quran: { text: '', meaning: '' },
@@ -61,20 +61,20 @@ function syncInputs() {
   });
 
   if (mode === 'image') {
-    $('#submit-label').textContent = 'استخراج النص والتحقّق';
+    $('#submit-label').textContent = mediaSource === 'url' ? 'تبيّن' : 'تبيّن';
     return;
   }
 
   if (searchType === 'meaning') {
-    $('.input-label').textContent = 'صف المعنى الذي تتذكره';
+    $('.input-label').textContent = 'صف المعنى الذي تتذكّره…';
     $('#query').placeholder = mode === 'hadith'
       ? 'مثال: حديث عن ثواب إماطة الأذى أو الإحسان للجار'
       : 'مثال: آية عن أن بعد الشدة فرج ويسر';
-    $('#submit-label').textContent = 'ابحث بالمعنى';
+    $('#submit-label').textContent = 'تبيّن';
   } else {
     $('.input-label').textContent = mode === 'hadith' ? 'اكتب الحديث أو جزءًا منه' : 'اكتب الآية أو جزءًا منها';
     $('#query').placeholder = 'مثال: ' + (examples[mode].text[0] || '');
-    $('#submit-label').textContent = 'تبيّن من النص';
+    $('#submit-label').textContent = 'تبيّن';
   }
 
   $('#examples').replaceChildren(node('span', '', 'جرّب الآن'));
@@ -134,7 +134,7 @@ document.querySelectorAll('[data-tab]').forEach(b => {
     e.preventDefault();
     const tabs = [...document.querySelectorAll('[data-tab]')];
     let i = tabs.indexOf(b);
-    i = e.key === 'Home' ? 0 : e.key === 'End' ? 2 : (i + (e.key === 'ArrowLeft' ? 1 : 2)) % 3;
+    i = e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : (i + (e.key === 'ArrowLeft' ? 1 : tabs.length - 1)) % tabs.length;
     selectMode(tabs[i].dataset.tab);
     tabs[i].focus();
   };
@@ -226,7 +226,7 @@ function records(card, items) {
     d.append(node('strong', '', r.grade || 'راجع حكم المحدّث في المصدر'));
     if (r.scholar) d.append(node('div', '', 'المحدّث: ' + r.scholar));
     const details = node('details');
-    details.append(node('summary', '', 'تفاصيل الرواية'));
+    details.append(node('summary', '', 'الراوي والتخريج'));
     for (const [k, l] of [['narrator', 'الراوي'], ['book', 'المصدر'], ['reference', 'الصفحة أو الرقم'], ['takhrij', 'التخريج'], ['gradeExplanation', 'توضيح الحكم']]) {
       if (r[k]) details.append(node('p', '', l + ': ' + r[k]));
     }
@@ -245,7 +245,7 @@ function card(text, type, meta, url, items) {
   c.append(head, p);
   if (items) records(c, items);
   const bottom = node('div', 'result-bottom');
-  bottom.append(link('الرجوع إلى المصدر ↗', url));
+  bottom.append(link('المصدر ↗', url));
   const copy = node('button', 'copy-button', 'نسخ النص');
   copy.type = 'button';
   copy.onclick = async () => {
@@ -264,7 +264,7 @@ function card(text, type, meta, url, items) {
 function render(data, kind) {
   $('#results').replaceChildren();
   showStatus(data.message || '');
-  $('#results-title').textContent = kind === 'image' ? 'النصوص المطابقة للمصادر' : 'نتائج البحث';
+  $('#results-title').textContent = kind === 'hadith' && data.mode === 'specialist' ? 'نتائج وضع المتخصص' : 'من المصدر إليك';
   if (kind === 'quran') {
     for (const r of data.results || []) {
       card(r.text_uthmani, 'quran', 'سورة ' + r.surah_name + ' · الآية ' + r.ayah, 'https://tanzil.net/#' + r.verse_key);
@@ -285,10 +285,10 @@ function render(data, kind) {
         const dIcon = node('span', 'disclaimer-icon', '✦');
         const dText = node('div', 'disclaimer-body');
         dText.append(
-          node('strong', '', 'العرض الميسّر لغير المتخصصين'),
+          node('strong', '', 'العرض المبسّط'),
           node('p', '', 'النتائج معروضة من الصفحة الأولى في المصدر. لمزيد من التثبت والروايات وأقوال المحدثين وتخريج الأسانيد، يُفضّل الاطلاع على العرض المتخصص.')
         );
-        const proBtn = node('button', 'pro-switch-btn', 'البحث في الوضع المتخصص (الموسوعة الكاملة) ↗');
+        const proBtn = node('button', 'pro-switch-btn', 'استكشف الروايات والتخريج');
         proBtn.type = 'button';
         proBtn.onclick = () => {
           hadithMode = 'specialist';
@@ -298,17 +298,17 @@ function render(data, kind) {
         disclaimer.append(dIcon, dText, proBtn);
         $('#results').append(disclaimer);
 
-        card(p.selected.text, 'hadith', 'الدرر السنية · العرض الميسّر', data.sourceUrl, p.selected.records);
+        card(p.selected.text, 'hadith', 'الدرر السنية · العرض المبسّط', data.sourceUrl, p.selected.records);
         for (const a of p.alternates || []) {
           card(a.text, 'hadith', 'رواية أخرى · الدرر السنية', data.sourceUrl, a.records);
         }
       } else {
         const noResultBox = node('div', 'no-results-pro-box');
-        const heading = node('h3', '', 'لم نجد نتيجة في العرض الميسّر لغير المتخصصين');
+        const heading = node('h3', '', 'لم نجد نتيجة في العرض المبسّط');
         const desc = node('p', '', data.hint || 'قد يكون الحديث موجودًا في الموسوعة الحديثية المتخصصة بألفاظ أو روايات أخرى.');
         const btnRow = node('div', 'pro-action-row');
 
-        const tryProBtn = node('button', 'submit try-pro-btn', 'البحث في الوضع المتخصص (الموسوعة الكاملة) ↗');
+        const tryProBtn = node('button', 'submit try-pro-btn', 'استكشف الروايات والتخريج');
         tryProBtn.type = 'button';
         tryProBtn.onclick = () => {
           hadithMode = 'specialist';
@@ -365,7 +365,7 @@ function render(data, kind) {
 function renderQuranSuggestions(candidates) {
   $('#results').replaceChildren();
   $('#results-title').textContent = 'عبارات بحث مقترحة';
-  showStatus('هذه اقتراحات للبحث، وليست نصوصًا موثّقة. اختر عبارة لتأكيد نصها في المصحف:');
+  showStatus('عبارات مقترحة للبحث، وليست نصوصًا موثّقة بعد. اختر عبارة لتأكيد نصها في المصحف:');
   candidates.forEach(cand => {
     const c = node('article', 'result-card candidate-card');
     const head = node('div', 'result-meta');
@@ -373,7 +373,7 @@ function renderQuranSuggestions(candidates) {
     const p = node('p', 'candidate-phrase');
     p.textContent = cand;
     const bottom = node('div', 'result-bottom');
-    const btn = node('button', 'submit candidate-pick-btn', 'البحث بهذه العبارة في المصحف ←');
+    const btn = node('button', 'submit candidate-pick-btn', 'تحقّق من المصدر ←');
     btn.type = 'button';
     btn.onclick = () => {
       searchQuranCandidate(cand);
@@ -438,7 +438,7 @@ function renderRetryButton(retryFn) {
 
 function renderHadithCandidates(candidates) {
   $('#results').replaceChildren();
-  $('#results-title').textContent = 'هل تقصد أحد هذه الأحاديث؟';
+  $('#results-title').textContent = 'هل هذا النص المقصود؟';
   showStatus('هذه نصوص استُرجعت من الدرر السنية بناءً على المعنى، وليست حكمًا على صحة الحديث. اختر حديثًا للتحقق من حكمه وسنده في المصدر:');
   if (!candidates || candidates.length === 0) {
     showStatus('لم نتمكن من العثور على أحاديث مطابقة للوصف. جرّب كلمات أخرى.');
@@ -452,7 +452,7 @@ function renderHadithCandidates(candidates) {
     const p = node('p', 'candidate-phrase');
     p.textContent = text;
     const bottom = node('div', 'result-bottom');
-    const btn = node('button', 'submit candidate-pick-btn', 'التحقق من هذا الحديث ←');
+    const btn = node('button', 'submit candidate-pick-btn', 'تحقّق من المصدر ←');
     btn.type = 'button';
     btn.onclick = () => {
       searchHadithCandidate(text);
@@ -788,6 +788,10 @@ async function executeMediaSearch() {
 
 $('#search-form').onsubmit = async e => {
   e.preventDefault();
+  if (mode === 'image' && mediaSource === 'url') {
+    executeUrlSearch();
+    return;
+  }
   const text = $('#query').value.trim();
   if (mode === 'image' ? !file : !text) {
     showStatus(mode === 'image' ? 'أضف صورة أو فيديو أولًا.' : (searchType === 'meaning' ? 'صف المعنى أولًا.' : 'اكتب عبارة للبحث أولًا.'), true);
@@ -826,5 +830,103 @@ $('#about-dialog').onclick = e => {
     }
   }
 };
+
+document.querySelectorAll('[data-media-source]').forEach(button => {
+  button.onclick = () => {
+    stop();
+    mediaSource = button.dataset.mediaSource;
+    document.querySelectorAll('[data-media-source]').forEach(b => {
+      const selected = b.dataset.mediaSource === mediaSource;
+      b.classList.toggle('active', selected);
+      b.setAttribute('aria-checked', String(selected));
+    });
+    $('#media-upload').hidden = mediaSource !== 'file';
+    $('#url-fields').hidden = mediaSource !== 'url';
+    syncInputs();
+  };
+});
+
+function extractVideoUrl(text) {
+  for (const match of text.matchAll(/https?:\/\/[^\s<>"']+/gi)) {
+    try {
+      const url = new URL(match[0].replace(/[),،؛]+$/, ''));
+      if (['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be',
+        'tiktok.com', 'www.tiktok.com', 'vm.tiktok.com', 'vt.tiktok.com',
+        'instagram.com', 'www.instagram.com'].includes(url.hostname.toLowerCase()) &&
+        url.protocol === 'https:' && !url.username && !url.password) return url.href;
+    } catch {}
+  }
+  return null;
+}
+
+async function executeUrlSearch() {
+  const url = extractVideoUrl($('#video-url').value);
+  if (!url) {
+    showStatus('ألصق رابطًا صالحًا من يوتيوب أو تيك توك أو إنستغرام.', true);
+    return;
+  }
+  stop();
+  const id = sequence;
+  const localController = new AbortController();
+  controller = localController;
+  const signal = localController.signal;
+  $('#results').replaceChildren();
+  showStatus('');
+  $('#results-title').textContent = 'التبيّن';
+  const loading = node('div', 'url-progress');
+  const caption = node('p', '', 'جارٍ إرسال الرابط…');
+  const progress = document.createElement('progress');
+  progress.max = 100;
+  progress.value = 0;
+  progress.setAttribute('aria-label', 'تقدّم معالجة المقطع');
+  const detail = node('span', 'loading-detail', 'تهيئة الطلب');
+  const cancel = node('button', 'cancel-button', 'إلغاء المتابعة');
+  cancel.type = 'button';
+  cancel.onclick = () => { stop(); showStatus('تم إلغاء المتابعة.'); };
+  loading.append(caption, progress, detail, cancel);
+  $('#status').append(loading);
+  $('#submit').disabled = true;
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; localController.abort(); }, 15 * 60 * 1000);
+  try {
+    const response = await fetch('/api/media/url/jobs', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }), signal
+    });
+    const created = await response.json();
+    if (!response.ok) throw Error(created.message || 'تعذّر بدء معالجة الرابط.');
+    if (!created.jobId) throw Error('لم يُرجع الخادم رقم المهمة.');
+    while (!signal.aborted && id === sequence) {
+      const response = await fetch('/api/media/url/jobs/' + encodeURIComponent(created.jobId), { signal });
+      const job = await response.json();
+      if (id !== sequence) return;
+      if (!response.ok) throw Error(job.message || 'تعذّرت متابعة المهمة.');
+      caption.textContent = job.message || 'جارٍ معالجة المقطع…';
+      progress.value = Math.max(0, Math.min(100, Number(job.progress) || 0));
+      detail.textContent = Math.round(progress.value) + '% — مراحل المعالجة';
+      if (job.status === 'failed') throw Error(job.error?.message || job.message || 'تعذّرت معالجة المقطع.');
+      if (job.status === 'completed') { render(job.result || {}, 'image'); return; }
+      await new Promise((resolve, reject) => {
+        const abort = () => { clearTimeout(wait); reject(new DOMException('Cancelled', 'AbortError')); };
+        const wait = setTimeout(() => { signal.removeEventListener('abort', abort); resolve(); }, 1500);
+        signal.addEventListener('abort', abort, { once: true });
+        if (signal.aborted) abort();
+      });
+    }
+  } catch (error) {
+    if (id !== sequence) return;
+    showStatus(timedOut ? 'انتهت مهلة المتابعة. جرّب مقطعًا أقصر.' :
+      error.name === 'AbortError' ? 'تم إلغاء المتابعة.' : error.message || 'تعذّر الاتصال بالسيرفر.', true);
+    if (error.name !== 'AbortError') {
+      const retry = node('button', 'retry-btn', 'إعادة المحاولة');
+      retry.type = 'button';
+      retry.onclick = executeUrlSearch;
+      $('#status').append(retry);
+    }
+  } finally {
+    clearTimeout(timer);
+    if (id === sequence) { controller = null; $('#submit').disabled = false; }
+  }
+}
 
 selectMode('quran');
