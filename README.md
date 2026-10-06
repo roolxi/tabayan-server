@@ -66,3 +66,17 @@ sudo journalctl -u tabayyan -f   # Follow logs
 تحتاج معالجة الروابط إلى FFmpeg وFFprobe وNode.js وإلى مفتاح OpenRouter في ملف `.env`.
 لا تُرسل مفاتيح الخدمات إلى المتصفح. يشغّل التطبيق المهام في الذاكرة؛ استخدم عامل Uvicorn واحدًا
 ما لم تستبدل مخزن المهام بمخزن مشترك بين العمال.
+
+## Mobile app
+
+The `/app` directory contains the shared Expo app for iOS and Android, including text and meaning search, media verification, and video-link verification.
+
+Run locally:
+```sh
+cd app
+npm ci
+npx expo start
+```
+
+Configure EXPO_PUBLIC_API_BASE_URL in app/.env when needed. Native builds are available through the iOS and Android GitHub Actions workflows.
+

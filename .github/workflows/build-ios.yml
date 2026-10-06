@@ -1,0 +1,70 @@
+name: Build Tabayyan Unsigned iOS App
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: app
+    permissions:
+      contents: write
+    env:
+      EXPO_PUBLIC_API_BASE_URL: ${{ secrets.EXPO_PUBLIC_API_BASE_URL }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Generate iOS Folder (Prebuild)
+        run: npx expo prebuild --platform ios
+
+      - name: Install CocoaPods
+        run: cd ios && pod install
+
+      - name: Force Node Path for Xcode
+        run: |
+          sudo ln -s $(command -v node) /usr/local/bin/node || true
+          echo "export NODE_BINARY=$(command -v node)" > ios/.xcode.env
+          echo "export NODE_BINARY=$(command -v node)" > ios/.xcode.env.local
+
+      - name: Build Unsigned App
+        run: |
+          WORKSPACE=$(find ios -maxdepth 1 -name "*.xcworkspace" | head -n 1)
+          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
+          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release -sdk iphoneos -arch arm64 CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGNING_IDENTITY="" EXPANDED_CODE_SIGN_IDENTITY="" COMPILER_INDEX_STORE_ENABLE=NO -derivedDataPath ./build
+
+      - name: Package to IPA
+        run: |
+          mkdir Payload
+          cp -r ./build/Build/Products/Release-iphoneos/*.app Payload/
+          zip -r Tabayyan.ipa Payload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tabayyan-Unsigned-IPA
+          path: app/Tabayyan.ipa
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: latest
+          name: "Tabayyan Latest Build"
+          body: "ملف IPA غير موقّع لتطبيق تبيّن. يمكن تثبيته عبر TrollStore أو AltStore أو SideStore."
+          files: app/Tabayyan.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

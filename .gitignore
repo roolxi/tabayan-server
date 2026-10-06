@@ -11,6 +11,9 @@ htmlcov/
 .env
 .env.*
 !.env.example
+app/.env
+app/.env.*
+!app/.env.example
 
 # Logs and temporary files
 *.log
@@ -22,12 +25,20 @@ extractor-test/
 Thumbs.db
 *.zip
 *.ipa
+*.apk
+*.aab
 Payload/
 
-# Node / Expo
+# Node / Expo / Mobile
 node_modules/
 .expo/
 dist/
+build/
+app/build/
+ios/
+android/
+app/ios/
+app/android/
 web-build/
 coverage/
 npm-debug.log*
